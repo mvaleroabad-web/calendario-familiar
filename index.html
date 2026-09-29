@@ -122,10 +122,10 @@ const CLIENT_ID =
 
 const SCOPES =
 "https://www.googleapis.com/auth/classroom.courses.readonly " +
-"https://www.googleapis.com/auth/classroom.coursework.me.readonly";
+"https://www.googleapis.com/auth/classroom.coursework.me.readonly
 
 let alumnoActual = "";
-
+let tareasPorAlumno = { Martin: [], Victoria: [] };
 function conectar(alumno) {
 
   alumnoActual = alumno;
@@ -210,7 +210,8 @@ async function cargarCursos(token) {
     }
   }
 
-  mostrarTareas(todas);
+  tareasPorAlumno[alumnoActual] = todas;
+mostrarTareas([...tareasPorAlumno.Martin, ...tareasPorAlumno.Victoria]);
 }
 
 function mostrarTareas(tareas) {
