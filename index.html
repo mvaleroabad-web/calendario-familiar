@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calendario familiar</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: #f5f7fb;
+      color: #333;
+    }
+
+    header {
+      background: #526d82;
+      color: white;
+      padding: 25px;
+      text-align: center;
+    }
+
+    .contenedor {
+      max-width: 1000px;
+      margin: auto;
+      padding: 20px;
+    }
+
+    .hijos {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+      margin-bottom: 25px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 14px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .martin {
+      background: #cfe8ff;
+    }
+
+    .victoria {
+      background: #ffd9eb;
+    }
+
+    .manual {
+      background: #fff0b8;
+    }
+
+    .tarjeta {
+      background: white;
+      padding: 18px;
+      margin: 12px 0;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    }
+
+    .fecha {
+      font-weight: bold;
+      color: #526d82;
+    }
+
+    #estado {
+      margin: 15px 0;
+      font-weight: bold;
+    }
+  </style>
+
+  <script src="https://accounts.google.com/gsi/client"></script>
+</head>
+
+<body>
+
+<header>
+  <h1>📅 Calendario familiar</h1>
+  <p>Martín · Victoria · Familia</p>
+</header>
+
+<div class="contenedor">
+
+  <h2>Classroom</h2>
+
+  <div class="hijos">
+    <button class="martin" onclick="conectar('Martin')">
+      🔵 Conectar Classroom de Martín
+    </button>
+
+    <button class="victoria" onclick="conectar('Victoria')">
+      🩷 Conectar Classroom de Victoria
+    </button>
+
+    <button class="manual" onclick="alert('Aquí añadiremos después exámenes y tareas de Aula1')">
+      ✏️ Añadir examen / Aula1
+    </button>
+  </div>
+
+  <div id="estado">
+    Todavía no se ha conectado ningún Classroom.
+  </div>
+
+  <h2>Próximas tareas</h2>
+
+  <div id="tareas">
+    <div class="tarjeta">
+      Cuando conectemos las cuentas de Martín y Victoria,
+      aquí aparecerán automáticamente sus tareas de Classroom.
+    </div>
+  </div>
+
+</div>
+
+<script>
+
+const CLIENT_ID =
+"655708095770-d7mv1lb0fcdu901kp8lfgjuaf1pivbl9.apps.googleusercontent.com";
+
+const SCOPES =
+"https://www.googleapis.com/auth/classroom.courses.readonly " +
+"https://www.googleapis.com/auth/classroom.coursework.me.readonly";
+
+let alumnoActual = "";
+
+function conectar(alumno) {
+
+  alumnoActual = alumno;
+
+  const cliente = google.accounts.oauth2.initTokenClient({
+
+    client_id: CLIENT_ID,
+
+    scope: SCOPES,
+
+    callback: (respuesta) => {
+
+      if (respuesta.error) {
+        document.getElementById("estado").innerText =
+        "No se pudo conectar con Classroom.";
+        return;
+      }
+
+      document.getElementById("estado").innerText =
+      "✅ Classroom de " + alumnoActual + " conectado.";
+
+      cargarCursos(respuesta.access_token);
+    }
+
+  });
+
+  cliente.requestAccessToken({
+    prompt: "select_account"
+  });
+}
+
+async function cargarCursos(token) {
+
+  const respuesta = await fetch(
+    "https://classroom.googleapis.com/v1/courses?courseStates=ACTIVE",
+    {
+      headers: {
+        Authorization: "Bearer " + token
+      }
+    }
+  );
+
+  const datos = await respuesta.json();
+
+  if (!datos.courses) {
+    document.getElementById("tareas").innerHTML =
+    "<div class='tarjeta'>No se encontraron clases.</div>";
+    return;
+  }
+
+  let todas = [];
+
+  for (const curso of datos.courses) {
+
+    const r = await fetch(
+      "https://classroom.googleapis.com/v1/courses/" +
+      curso.id +
+      "/courseWork?courseWorkStates=PUBLISHED",
+      {
+        headers: {
+          Authorization: "Bearer " + token
+        }
+      }
+    );
+
+    const d = await r.json();
+
+    if (d.courseWork) {
+
+      d.courseWork.forEach(tarea => {
+
+        todas.push({
+          alumno: alumnoActual,
+          asignatura: curso.name,
+          titulo: tarea.title,
+          descripcion: tarea.description || "",
+          fecha: tarea.dueDate,
+          enlace: tarea.alternateLink
+        });
+
+      });
+    }
+  }
+
+  mostrarTareas(todas);
+}
+
+function mostrarTareas(tareas) {
+
+  const zona = document.getElementById("tareas");
+
+  zona.innerHTML = "";
+
+  if (tareas.length === 0) {
+    zona.innerHTML =
+    "<div class='tarjeta'>No hay tareas pendientes.</div>";
+    return;
+  }
+
+  tareas.forEach(t => {
+
+    let fecha = "Sin fecha de entrega";
+
+    if (t.fecha) {
+      fecha =
+      t.fecha.day + "/" +
+      t.fecha.month + "/" +
+      t.fecha.year;
+    }
+
+    zona.innerHTML += `
+      <div class="tarjeta">
+        <div class="fecha">${fecha}</div>
+
+        <h3>${t.alumno} · ${t.asignatura}</h3>
+
+        <strong>${t.titulo}</strong>
+
+        <p>${t.descripcion}</p>
+
+        ${
+          t.enlace
+          ? `<a href="${t.enlace}" target="_blank">
+               Abrir actividad en Classroom
+             </a>`
+          : ""
+        }
+      </div>
+    `;
+  });
+}
+
+</script>
+
+</body>
+</html>
